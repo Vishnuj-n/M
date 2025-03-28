@@ -12,9 +12,6 @@ class Meme:
         self.client = genai.Client(api_key=self.api_key)
         self.model = "gemini-2.0-flash-exp-image-generation"
 
-    def save_binary_file(self, file_name, data):
-        with open(file_name, "wb") as f:
-            f.write(data)
 
     def generate(self, prompt):
         contents = [
