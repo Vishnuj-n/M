@@ -1,6 +1,6 @@
 from PIL import Image, ImageDraw, ImageFont
 import base64
-import io
+from io import BytesIO
 import toml
 from google import genai
 from google.genai import types
@@ -13,35 +13,26 @@ class Meme:
         self.model = "gemini-2.0-flash-exp-image-generation"
 
 
-    def generate(self, prompt):
-        contents = [
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=prompt)],
-            ),
-        ]
-        generate_content_config = types.GenerateContentConfig(
-            response_modalities=["image"],
-            response_mime_type="text/plain",
-        )
+    def generate_image(self,prompt):
+        prompt_t=(prompt)
 
-        for chunk in self.client.models.generate_content_stream(
+        response = self.client.models.generate_content(
             model=self.model,
-            contents=contents,
-            config=generate_content_config,
-        ):
-            if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
-                continue
-            if chunk.candidates[0].content.parts[0].inline_data:
-                inline_data = chunk.candidates[0].content.parts[0].inline_data
-                image_data = base64.b64decode(inline_data.data)
-                image = Image.open(io.BytesIO(image_data))
+            contents=prompt_t,
+            config=types.GenerateContentConfig(
+            response_modalities=['Text', 'Image']
+        )
+    )
+        for part in response.candidates[0].content.parts:
+            if part.text is not None:
+                print(part.text)
+            elif part.inline_data is not None:
+                image = Image.open(BytesIO((part.inline_data.data)))
+                image.save('gemini-native-image.png')
                 return image
-            else:
-                print(chunk.text)
         return None
 
-    def generate_meme(self, image, text, position='bottom'):
+    def add_text(self, image, text, position='bottom'):
         try:
   
             if image.mode != 'RGBA':
