@@ -31,7 +31,7 @@ if st.button("Add Text to Meme"):
                 if image1.mode != 'RGBA':
                     image1 = image1.convert('RGBA')
                 meme = meme_generator.add_text(image1,text, position)
-                st.image(meme, caption="Final Meme", use_column_width=True)
+                st.image(meme, caption="Final Meme", use_container_width =True)
                 #meme_generator.save_meme("final_meme.png")
                 st.success("Meme saved as final_meme.png")
             except Exception as e:
