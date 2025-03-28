@@ -5,7 +5,7 @@ import toml
 from google import genai
 from google.genai import types
 
-class MemeGenerator:
+class Meme:
     def __init__(self, secrets_file=".streamlit/secrets.toml"):
         self.secrets = toml.load(secrets_file)
         self.api_key = self.secrets["GEMINI_API_KEY"]
