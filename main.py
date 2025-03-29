@@ -2,7 +2,7 @@ from PIL import Image, ImageDraw, ImageFont
 import base64
 from io import BytesIO
 import toml
-from google import genai
+import google.generativeai as genai
 from google.genai import types
 
 class Meme:
