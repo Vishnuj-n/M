@@ -1,20 +1,18 @@
 from PIL import Image, ImageDraw, ImageFont
 import base64
 from io import BytesIO
-import toml
 from google import genai
 from google.genai import types
-
+import streamlit as st
 class Meme:
-    def __init__(self, secrets_file=".streamlit/secrets.toml"):
-        self.secrets = toml.load(secrets_file)
-        self.api_key = self.secrets["GEMINI_API_KEY"]
+    def __init__(self, key):  
+        self.api_key = st.secrets[key]
         self.client = genai.Client(api_key=self.api_key)
         self.model = "gemini-2.0-flash-exp-image-generation"
 
 
     def generate_image(self,prompt):
-        prompt_t=(prompt)
+        prompt_t=f"Create a Image for: {prompt}"
 
         response = self.client.models.generate_content(
             model=self.model,

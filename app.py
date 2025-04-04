@@ -1,9 +1,11 @@
 import streamlit as st
 from PIL import Image
 from main import Meme
-
+import random
 # Initialize Meme class
-meme_generator = Meme()
+api_keys=["GEMINI_API_KEY", "GM1", "GM2","GM3"]
+key = random.choice(api_keys)
+meme_generator = Meme(key=key)
 
 st.title("AI Meme Generator")
 
