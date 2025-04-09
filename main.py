@@ -5,8 +5,13 @@ from google import genai
 from google.genai import types
 import streamlit as st
 class Meme:
-    def __init__(self, key):  
-        self.api_key = st.secrets[key]
+    def __init__(self, key, user_api_key=None):  
+        # Use user provided API key if available, otherwise use from secrets
+        if user_api_key and user_api_key.strip():
+            self.api_key = user_api_key
+        else:
+            self.api_key = st.secrets[key]
+            
         self.client = genai.Client(api_key=self.api_key)
         self.model = "gemini-2.0-flash-exp-image-generation"
 
