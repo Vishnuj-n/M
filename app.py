@@ -67,14 +67,15 @@ def register_user(name, roll_no):
         dataset_id = st.secrets.get("bigquery_dataset", "meme_generator")
         table_id = f"{dataset_id}.users"
         
-        # Insert user data
+        # Insert user data with current timestamp using SQL
+        from datetime import datetime
+        current_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        
         rows_to_insert = [
             {
                 "name": name,
                 "roll_number": roll_no,
-                "registration_date": bigquery.ScalarQueryParameter(
-                    "timestamp", "TIMESTAMP", bigquery.CURRENT_TIMESTAMP
-                ).to_api_repr()["parameterValue"]["value"]
+                "registration_date": current_time
             }
         ]
         
