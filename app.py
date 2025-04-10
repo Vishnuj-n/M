@@ -82,7 +82,7 @@ if 'user_name' not in st.session_state:
     st.session_state.user_name = ""
 
 
-api_keys=["GEMINI_API_KEY", "GM1", "GM2"]
+api_keys=["GEMINI_API_KEY", "GM1"]
 key = random.choice(api_keys)
 meme_generator = Meme(key=key)
 
