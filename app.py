@@ -3,7 +3,44 @@ from PIL import Image
 from main import Meme
 import random
 import os
-import csv
+from google.oauth2 import service_account
+from google.cloud import bigquery
+
+# Initialize BigQuery client
+@st.cache_resource
+def get_bigquery_client():
+    credentials = service_account.Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"]
+    )
+    return bigquery.Client(credentials=credentials)
+
+# Initialize BigQuery tables if they don't exist
+def initialize_bigquery_tables():
+    client = get_bigquery_client()
+    dataset_id = st.secrets.get("bigquery_dataset", "meme_generator")
+    table_id = "users"
+    
+    # Check if dataset exists, if not create it
+    dataset_ref = client.dataset(dataset_id)
+    try:
+        client.get_dataset(dataset_ref)
+    except Exception:
+        dataset = bigquery.Dataset(dataset_ref)
+        dataset.location = "US"  # You can change the location if needed
+        client.create_dataset(dataset)
+    
+    # Check if users table exists, if not create it
+    table_ref = dataset_ref.table(table_id)
+    try:
+        client.get_table(table_ref)
+    except Exception:
+        schema = [
+            bigquery.SchemaField("name", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("roll_number", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("registration_date", "TIMESTAMP", mode="REQUIRED")
+        ]
+        table = bigquery.Table(table_ref, schema=schema)
+        client.create_table(table)
 
 def validate_roll_number(roll_no):
     """Validate if roll number is alphanumeric and not empty"""
@@ -14,7 +51,7 @@ def validate_roll_number(roll_no):
     return True, "Valid"
 
 def register_user(name, roll_no):
-    """Register user with name and roll number"""
+    """Register user with name and roll number in BigQuery"""
     is_valid, message = validate_roll_number(roll_no)
     if not name:
         return False, "Name cannot be empty"
@@ -25,52 +62,79 @@ def register_user(name, roll_no):
     if check_user_exists(roll_no):
         return False, "Roll number already registered"
     
-    # Save to register.csv
-    csv_path = "register.csv"
-    file_exists = os.path.isfile(csv_path)
-    
     try:
-        with open(csv_path, mode='a', newline='') as file:
-            writer = csv.writer(file)
-            # Write header if file is new
-            if not file_exists:
-                writer.writerow(["Name", "Roll Number"])
-            # Write user data
-            writer.writerow([name, roll_no])
-        return True, "Registration successful"
+        client = get_bigquery_client()
+        dataset_id = st.secrets.get("bigquery_dataset", "meme_generator")
+        table_id = f"{dataset_id}.users"
+        
+        # Insert user data
+        rows_to_insert = [
+            {
+                "name": name,
+                "roll_number": roll_no,
+                "registration_date": bigquery.ScalarQueryParameter(
+                    "timestamp", "TIMESTAMP", bigquery.CURRENT_TIMESTAMP
+                ).to_api_repr()["parameterValue"]["value"]
+            }
+        ]
+        
+        errors = client.insert_rows_json(table_id, rows_to_insert)
+        if errors == []:
+            return True, "Registration successful"
+        else:
+            return False, f"Registration failed: {errors}"
     except Exception as e:
         return False, f"Registration failed: {str(e)}"
 
 def check_user_exists(roll_no):
-    """Check if user with roll number exists in register.csv"""
-    if not os.path.isfile("register.csv"):
-        return False
-    
+    """Check if user with roll number exists in BigQuery"""
     try:
-        with open("register.csv", mode='r') as file:
-            reader = csv.reader(file)
-            # Skip header
-            next(reader, None)
-            for row in reader:
-                if len(row) >= 2 and row[1] == roll_no:
-                    return True
-        return False
+        client = get_bigquery_client()
+        dataset_id = st.secrets.get("bigquery_dataset", "meme_generator")
+        
+        query = f"""
+        SELECT COUNT(*) as count
+        FROM `{dataset_id}.users`
+        WHERE roll_number = @roll_number
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("roll_number", "STRING", roll_no)
+            ]
+        )
+        
+        query_job = client.query(query, job_config=job_config)
+        result = list(query_job.result())[0]
+        
+        return result.count > 0
     except Exception:
         return False
 
 def get_user_name(roll_no):
-    """Get user name from roll number"""
-    if not os.path.isfile("register.csv"):
-        return None
-    
+    """Get user name from roll number using BigQuery"""
     try:
-        with open("register.csv", mode='r') as file:
-            reader = csv.reader(file)
-            # Skip header
-            next(reader, None)
-            for row in reader:
-                if len(row) >= 2 and row[1] == roll_no:
-                    return row[0]
+        client = get_bigquery_client()
+        dataset_id = st.secrets.get("bigquery_dataset", "meme_generator")
+        
+        query = f"""
+        SELECT name
+        FROM `{dataset_id}.users`
+        WHERE roll_number = @roll_number
+        LIMIT 1
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("roll_number", "STRING", roll_no)
+            ]
+        )
+        
+        query_job = client.query(query, job_config=job_config)
+        results = list(query_job.result())
+        
+        if results:
+            return results[0].name
         return None
     except Exception:
         return None
@@ -81,6 +145,8 @@ if 'logged_in' not in st.session_state:
 if 'user_name' not in st.session_state:
     st.session_state.user_name = ""
 
+# Initialize BigQuery tables
+initialize_bigquery_tables()
 
 api_keys=["GEMINI_API_KEY", "GM1"]
 key = random.choice(api_keys)
@@ -120,7 +186,7 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.user_name = user_name
                 st.sidebar.success(f"Welcome, {user_name}!")
-                st.rerun()  # Use st.rerun() instead of st.experimental_rerun()
+                st.rerun()
             else:
                 st.sidebar.error("Roll number not registered")
     
@@ -139,7 +205,7 @@ else:
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.session_state.user_name = ""
-        st.rerun()  # Use st.rerun() instead of st.experimental_rerun()
+        st.rerun()
 
 st.title("AI Meme Generator")
 
@@ -168,8 +234,7 @@ if st.button("Add Text to Meme"):
                     image1 = image1.convert('RGBA')
                 meme = meme_generator.add_text(image1,text, position)
                 st.image(meme, caption="Final Meme", use_container_width =True)
-                #meme_generator.save_meme("final_meme.png")
-                st.success("Meme saved as final_meme.png")
+                st.success("Meme generated successfully")
             except Exception as e:
                 st.error(f"Error: {e}")
     else:
