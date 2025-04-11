@@ -1,43 +1,43 @@
+# main.py
 from PIL import Image, ImageDraw, ImageFont
 import base64
 from io import BytesIO
-from google import genai
-from google.genai import types
+from openai import OpenAI
 import streamlit as st
+import requests
+
 class Meme:
     def __init__(self, key, user_api_key=None):  
         # Use user provided API key if available, otherwise use from secrets
         if user_api_key and user_api_key.strip():
             self.api_key = user_api_key
         else:
-            self.api_key = st.secrets[key]
+            self.api_key = key
+        
+        self.client = OpenAI(api_key=self.api_key)
+
+    def generate_image(self, prompt):
+        try:
+            response = self.client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                size="1024x1024",
+                quality="standard",
+                n=1,
+            )
             
-        self.client = genai.Client(api_key=self.api_key)
-        self.model = "gemini-2.0-flash-exp-image-generation"
-
-
-    def generate_image(self,prompt):
-        prompt_t=f"Create a Image for: {prompt}"
-
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt_t,
-            config=types.GenerateContentConfig(
-            response_modalities=['Text', 'Image']
-        )
-    )
-        for part in response.candidates[0].content.parts:
-            if part.text is not None:
-                print(part.text)
-            elif part.inline_data is not None:
-                image = Image.open(BytesIO((part.inline_data.data)))
-                image.save('gemini-native-image.png')
-                return image
-        return None
+            # Convert the image URL to a PIL image
+            image_url = response.data[0].url
+            image_response = requests.get(image_url, stream=True)
+            image = Image.open(BytesIO(image_response.content))
+            
+            return image
+        except Exception as e:
+            st.error(f"Error generating image: {str(e)}")
+            return None
 
     def add_text(self, image, text, position='bottom'):
         try:
-  
             if image.mode != 'RGBA':
                 image = image.convert('RGBA')
 
@@ -89,7 +89,5 @@ class Meme:
             final_image = Image.alpha_composite(image, blank_image)
             return final_image
 
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Image file not found")
         except Exception as e:
             raise Exception(f"Error processing image: {str(e)}")
