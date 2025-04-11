@@ -1,8 +1,6 @@
 streamlit>=1.27.0
 Pillow>=10.0.0
-google-generativeai>=0.3.0
 toml>=0.10.2
 python-dotenv>=1.0.0
 requests>=2.31.0
-google-genai
-google-cloud-bigquery>=3.4.0
+openai>=1.0.0
