@@ -1,6 +1,8 @@
 import streamlit as st
 from PIL import Image
 from main import Meme
+from io import BytesIO
+import base64
 
 
 st.title("AI Meme Generator")
